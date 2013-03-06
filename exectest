@@ -1,0 +1,289 @@
+#!/bin/bash      
+#  OR  #!/bin/env -i /bin/bash   # For clearing all environmental variables before running
+# Script to run a casperjs based test case
+
+# set -x  # uncomment to give script trace; not always a useful thing to do since it can botch command interpolation
+# set -o errexit    # uncomment to exit immediately when command returns non-zero; stupid to do since non-zero is often not a fatal error
+
+export app=$(basename $0)   # default application name
+umask 177                   # default file permissions mask
+
+# source $(dirname $0)/library.file.sh   # uncomment and adjust to incorporate external script; recommend to use shell functions
+
+# Send a message to stderr and exit with non-zero error code
+# 
+function ferror() {
+  if [[ ! -z "$1" ]]
+  then
+    echo $1 >&2
+  fi
+  exit 1
+}
+
+# Best practice: write most of the usage out before writing the rest of the script
+function fusage() {
+  if [[ ! -z "$1" ]]
+  then
+    echo $1 >&2
+  fi
+  cat <<EOT
+$app: run a casperjs based test case
+Usage: $app -case testcasename [--path webrootpath] [--site hostname] [--open] [--nop] [--a "--username=foo" [-a "--password=bar"] ...]
+       $app (-h|--help)
+       $app -v|--view testcasename
+
+Where 
+  -c | --case  run ./testsuite/testcasename.coffee; required
+
+  -p | --path  The root web path relative to http://dev.wolftech.ncsu.edu/ is...; optional
+
+  -s | --site  The host is ... instead of dev.wolftech.ncsu.edu; optional
+
+  -o | --open  open a screenshot of session upon test failure; optional
+
+  -n | --nop   "No Operation" - prevents anything from happening, echoes the steps to be taken; optional
+
+  -a | --scriptarg A string containing any named arguments to pass to the casperjs script; optional; use as many as needed
+
+  -h | --help  Output this message
+
+  -v | --view  Views test case output
+
+Description
+$app executes a test 
+
+Example
+
+  $app --open optional_other_inputs
+
+  $app -case optional_other_inputs --path reu-assist --open
+
+Limitations
+
+  Tests are assumed to be located in ./testsuite/ 
+  Test output is assumed to be located in ./testout/ 
+  No attempt is made to keep history of old test runs. 
+  Tests are assumed to be run on the casperjs engine.
+  Tests are assumed to be written in coffeescript and end in the suffix ".coffee"
+  Due to the way shell parses command lines, the scriptarg arguments cannot include spaces.
+EOT
+
+}
+
+function sig_interrupt() {
+  # ferror "Caught SIGINT"
+  true
+}
+
+function sig_hup() {
+  # ferror "Caught SIGHUP"
+  true
+}
+
+function sig_quit() {
+  # ferror "Caught SIGQUIT"
+  true
+}
+
+function sig_terminate() {
+  # ferror "Caught SIGTERM"
+  true
+}
+
+function sig_exit() {
+  # ferror "Caught SIGEXIT"
+  true
+}
+
+function sig_untrap() {
+  trap - HUP INT QUIT TERM
+}
+
+function sig_cleanup_or_rollback() {
+  # Remove files that shouldn't be left around
+  sig_untrap
+}
+
+trap sig_interrupt   INT
+trap sig_quit        QUIT
+trap sig_hup         HUP
+trap sig_terminate   TERM
+trap sig_exit        EXIT
+trap sig_cleanup_or_rollback     HUP INT QUIT TERM 
+
+# Available signals to trap
+#  1) SIGHUP   2) SIGINT   3) SIGQUIT  4) SIGILL   5) SIGTRAP  6) SIGABRT  7) SIGEMT  8) SIGFPE   
+# 10) SIGBUS  11) SIGSEGV 12) SIGSYS  13) SIGPIPE 14) SIGALRM 15) SIGTERM 16) SIGURG 18) SIGTSTP 
+# 20) SIGCHLD 21) SIGTTIN 22) SIGTTOU 23) SIGIO 24) SIGXCPU 25) SIGXFSZ 26) SIGVTALRM 27) SIGPROF 28) SIGWINCH 29) SIGINFO 
+# 30) SIGUSR1 31) SIGUSR2
+# Not available: 9) SIGKILL  17) SIGSTOP 19) SIGCONT 
+
+function Main() {
+  # Baseline default settings so defaults cannot be imported accidentally
+  local ECHODBG=''
+  local open=''
+  local scriptargs=''
+  local testcase=''
+  local site=''
+  local webrootpath=''
+  local outputdir="./testout"
+
+  local opendefault=${ExectestOpenDefault:-''}   # import default via shell variable 
+  local casedefault=''
+  local sitedefault='dev.wolftech.ncsu.edu'
+  local webrootpathdefault=''
+  local scriptargsdefault=''
+
+  # declare -a array_variable                      # Dereference as ${array_variable[nn]}
+  # array_var2=( [0]="elem1" "eel2" "..." "eeelN" )# Dereference as ${array_var2[nn]}, ${array_var2[*]}, ${array_var2[@]}
+  # length=${#array_var2[@]}                       # get length of array
+  # length=${#array_var2[0]}                       # get length of first element of array
+
+  # Variable interpolation
+  # ${array_var[@]#e*1}      # Matches "elem1" against all elements and removes it.
+  # ${varx##e*}      # Longest match from front of string(s)
+  # ${varx%l[0-9]}   # Shortest match from back of string(s)
+  # ${varx%%l[0-9]*} # Longest match from back of string(s)
+  # ${varx/el/EL}    # replace first occurrence of substring
+  # ${varx//el/EL}   # replace occurrences of substring
+  # ${varx//EL/}     # delete occurrences of substring
+  # ${varx/#e/ELEM/}     # replace leftmost occurrence of substring
+  # ${varx/%N/n/}     # replace rightmost occurrence of substring
+
+  # Variable math
+  # let "varname *= 3"   # multiplication; += addition; %= modulus;
+  # let varname=varname+1 ; let "varname = varname + 1"
+  # ((varname+=1))
+  # varname=$(($varname+1)); varname=(($varname+1)); varname=((varname+1))
+
+  while [[ ! -z "$1" ]]
+  do
+    case "$1" in 
+
+    "-h"|"--help")
+      fusage
+      exit 0
+    ;;
+
+    "-n"|"--nop") 
+      ECHODBG="echo"
+     ;;
+
+    "-p"|"--path")
+       if [[ -z "$2" ]]
+       then
+         ferror "--path missing path argument"
+       fi
+       webrootpath="$2"
+       shift
+    ;;
+
+    "-s"|"--site")
+       if [[ -z "$2" ]]
+       then
+         ferror "--site missing hostname argument"
+       fi
+       site="$2"
+       shift
+    ;;
+
+    "-c"|"--case")
+       if [[ -z "$2" ]]
+       then
+         ferror "--case missing testcasename argument"
+       fi
+       testcase="$2"
+       shift
+    ;;
+
+    "-a"|"--scriptarg")
+       if [[ -z "$2" ]]
+       then
+         ferror "--scriptarg missing argument"
+       fi
+       scriptargs="$scriptargs $2"
+       shift
+    ;;
+      
+    "-v"|"--view")
+       if [[ -z "$2" ]]
+       then
+         ferror "--view missing argument"
+       fi
+      less $outputdir/$2
+      exit 0
+    ;;
+
+    "-o"|"--open")
+       open="true"
+       shift
+    ;;
+      
+    *)   # handle other arguments
+      ferror "Unexpected argument! Bailing out..."
+    ;;
+      
+    esac
+    shift
+  done
+
+  # Sometimes it is useful to have a default-default and to
+  # use conditional logic for computing default after all options have been parsed
+  # So here we check arguments to realize the final default overrides
+  open=${open:-$opendefault}
+  scriptargs="${scriptargs:-$scriptargsdefault}"
+  testcase=${testcase:-$casedefault}
+  site=${site:-$sitedefault}
+  webrootpath=${webrootpath:-$webrootpathdefault}
+  testfile="./testsuite/${testcase}.coffee"
+  local snapshot=''
+
+  if [[ -z "$testcase" ]]
+  then
+    ferror "--case 'testcase' is a required argument." 
+  fi
+
+  if [[ ! -f "$testfile" ]]
+  then
+    ferror "'$testfile' is not a readable file." 
+  fi
+  if [[ "$open" = "true" ]]
+  then
+    snapshot="--screenfile ./testout/$testcase.png"
+  fi
+
+  if [[ ! -e $outputdir ]]
+  then
+    mkdir $outputdir 2>/dev/null
+    chmod ugo+rwx $outputdir 2>/dev/null
+  else
+    if [[ ! -d $outputdir ]]
+    then
+      ferror "$outputdir exists already and is not a directory"
+    fi
+  fi
+
+  # call Module defined as function or sourced script here
+  # Do what must be done
+  # module "$someopt" "$ECHODBG" "OTHERARG"
+  # $ECHODBG echo "Test Case: $testcase; no-op: $ECHODBG"
+  # $ECHODBG read -p "Press enter to continue..." yorn
+
+  if [[ "$ECHODBG" = "echo" ]]
+  then
+    $ECHODBG "casperjs \"$testfile\"  --ignore-ssl-errors=yes  --testhost=${site}/${webrootpath} $snapshot $scriptargs 2>&1 | cat -v | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt"
+  else
+    export testfile
+    casperjs "$testfile" \
+      --ignore-ssl-errors=yes \
+      --testhost=${site}/${webrootpath}  \
+      $snapshot $scriptargs 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
+  fi
+
+  $ECHODBG find $outputdir -name "*.txt" -mtime -5m
+
+  sig_untrap
+}
+
+# Invoke main module
+Main $*
