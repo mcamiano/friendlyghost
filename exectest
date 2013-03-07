@@ -28,7 +28,7 @@ function fusage() {
   fi
   cat <<EOT
 $app: run a casperjs based test case
-Usage: $app -case testcasename [--path webrootpath] [--site hostname] [--open] [--nop] [--a "--username=foo" [-a "--password=bar"] ...]
+Usage: $app --case testcasename [--path webrootpath] [--site hostname] [--open] [--nop] [--a "--username=foo" [-a "--password=bar"] ...]
        $app (-h|--help)
        $app -v|--view testcasename
        $app -l|--list testcasename
@@ -124,14 +124,14 @@ trap sig_cleanup_or_rollback     HUP INT QUIT TERM
 function Main() {
   # Baseline default settings so defaults cannot be imported accidentally
   local ECHODBG=''
-  local open=''
+  local open="false"
   local scriptargs=''
   local testcase=''
   local site=''
   local webrootpath=''
   local outputdir="./testout"
 
-  local opendefault=${ExectestOpenDefault:-''}   # import default via shell variable 
+  local opendefault=${ExectestOpenDefault:-'false'}   # import default via shell variable 
   local casedefault=''
   local sitedefault='dev.wolftech.ncsu.edu'
   local webrootpathdefault=''
@@ -169,7 +169,7 @@ function Main() {
     ;;
 
     "-n"|"--nop") 
-      ECHODBG="echo"
+      export ECHODBG="echo"
      ;;
 
     "-p"|"--path")
@@ -228,7 +228,6 @@ function Main() {
 
     "-o"|"--open")
        open="true"
-       shift
     ;;
       
     *)   # handle other arguments
@@ -245,10 +244,10 @@ function Main() {
   open=${open:-$opendefault}
   scriptargs="${scriptargs:-$scriptargsdefault}"
   testcase=${testcase:-$casedefault}
+  snapshotfile="$outputdir/$testcase.png"
   site=${site:-$sitedefault}
   webrootpath=${webrootpath:-$webrootpathdefault}
   testfile="./testsuite/${testcase}.coffee"
-  local snapshot=''
 
   if [[ -z "$testcase" ]]
   then
@@ -258,10 +257,6 @@ function Main() {
   if [[ ! -f "$testfile" ]]
   then
     ferror "'$testfile' is not a readable file." 
-  fi
-  if [[ "$open" = "true" ]]
-  then
-    snapshot="--screenfile ./testout/$testcase.png"
   fi
 
   if [[ ! -e $outputdir ]]
@@ -283,13 +278,17 @@ function Main() {
 
   if [[ "$ECHODBG" = "echo" ]]
   then
-    $ECHODBG "casperjs \"$testfile\"  --ignore-ssl-errors=yes  --testhost=${site}/${webrootpath} $snapshot $scriptargs 2>&1 | cat -v | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt"
+    $ECHODBG "casperjs \"$testfile\"  --ignore-ssl-errors=yes  --testhost=${site}/${webrootpath} --screenfile=$snapshotfile $scriptargs 2>&1 | cat -v | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt"
   else
     export testfile
     casperjs "$testfile" \
       --ignore-ssl-errors=yes \
       --testhost=${site}/${webrootpath}  \
-      $snapshot $scriptargs 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
+      --screenfile=$snapshotfile $scriptargs 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
+    if $open
+    then
+      open "$snapshotfile"
+    fi
   fi
 
   $ECHODBG find $outputdir -name "*.txt" -mtime -5m
