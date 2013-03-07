@@ -31,6 +31,7 @@ $app: run a casperjs based test case
 Usage: $app -case testcasename [--path webrootpath] [--site hostname] [--open] [--nop] [--a "--username=foo" [-a "--password=bar"] ...]
        $app (-h|--help)
        $app -v|--view testcasename
+       $app -l|--list testcasename
 
 Where 
   -c | --case  run ./testsuite/testcasename.coffee; required
@@ -48,6 +49,8 @@ Where
   -h | --help  Output this message
 
   -v | --view  Views test case output
+
+  -l | --list  Lists any test cases matching expression testcasename
 
 Description
 $app executes a test 
@@ -213,6 +216,15 @@ function Main() {
       less $outputdir/$2
       exit 0
     ;;
+
+    "-l"|"--list")
+      shift
+      export args="$*" 
+      export outputdir
+      (cd testsuite; ls $args)
+      exit 0
+    ;;
+
 
     "-o"|"--open")
        open="true"
