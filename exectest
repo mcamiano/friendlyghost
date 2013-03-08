@@ -32,6 +32,7 @@ Usage: $app --case testcasename [--path webrootpath] [--site hostname] [--open] 
        $app (-h|--help)
        $app -v|--view testcasename
        $app -l|--list testcasename
+       $app -x|--clean
 
 Where 
   -c | --case  run ./testsuite/testcasename.coffee; required
@@ -51,6 +52,8 @@ Where
   -v | --view  Views test case output
 
   -l | --list  Lists any test cases matching expression testcasename
+
+  -x | --clean Removes any testout files (destructive!)
 
 Description
 $app executes a test 
@@ -225,6 +228,12 @@ function Main() {
       exit 0
     ;;
 
+    "-x"|"--clean")
+      cd $outputdir
+      rm *.txt *.png
+      git checkout .
+      exit 0
+    ;;
 
     "-o"|"--open")
        open="true"
