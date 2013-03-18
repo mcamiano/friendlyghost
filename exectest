@@ -290,10 +290,19 @@ function Main() {
     $ECHODBG "casperjs \"$testfile\"  --ignore-ssl-errors=yes  --testhost=${site}/${webrootpath} --screenfile=$snapshotfile $scriptargs 2>&1 | cat -v | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt"
   else
     export testfile
-    casperjs "$testfile" \
-      --ignore-ssl-errors=yes \
-      --testhost=${site}/${webrootpath}  \
-      --screenfile=$snapshotfile $scriptargs 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
+# casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
+# --direct  --log-level=debug  --fail-fast  
+# or just pass ./testsuite/ directory
+    casperjs test  "$testfile" \
+      --pre=./testsuite/pretest.coffee  \
+      --post=./testsuite/posttest.coffee \
+      --includes=./testsuite/eachtest.coffee \
+    2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
+
+    # casperjs "$testfile" \
+      # --ignore-ssl-errors=yes \
+      # --testhost=${site}/${webrootpath}  \
+      # --screenfile=$snapshotfile $scriptargs 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
     if $open
     then
       open "$snapshotfile"
