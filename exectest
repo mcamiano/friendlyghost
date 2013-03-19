@@ -253,10 +253,10 @@ function Main() {
   open=${open:-$opendefault}
   scriptargs="${scriptargs:-$scriptargsdefault}"
   testcase=${testcase:-$casedefault}
-  snapshotfile="$outputdir/$testcase.png"
   site=${site:-$sitedefault}
   webrootpath=${webrootpath:-$webrootpathdefault}
   testfile="./testsuite/${testcase}.coffee"
+  snapshotfile="$outputdir/${testcase}.coffee.png"
 
   if [[ -z "$testcase" ]]
   then
@@ -279,31 +279,26 @@ function Main() {
     fi
   fi
 
-  # call Module defined as function or sourced script here
-  # Do what must be done
-  # module "$someopt" "$ECHODBG" "OTHERARG"
-  # $ECHODBG echo "Test Case: $testcase; no-op: $ECHODBG"
-  # $ECHODBG read -p "Press enter to continue..." yorn
-
   if [[ "$ECHODBG" = "echo" ]]
   then
     $ECHODBG "casperjs \"$testfile\"  --ignore-ssl-errors=yes  --testhost=${site}/${webrootpath} --screenfile=$snapshotfile $scriptargs 2>&1 | cat -v | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt"
   else
     export testfile
-# casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
-# --direct  --log-level=debug  --fail-fast  
-# or just pass ./testsuite/ directory
+    if $open
+    then
+      /bin/rm "$snapshotfile" 2>/dev/null
+    fi
+
+      # casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
+      # --direct  --log-level=debug  --fail-fast  
+      # or just pass ./testsuite/ directory
     casperjs test  "$testfile" \
       --pre=./testsuite/pretest.coffee  \
       --post=./testsuite/posttest.coffee \
       --includes=./testsuite/eachtest.coffee \
     2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
 
-    # casperjs "$testfile" \
-      # --ignore-ssl-errors=yes \
-      # --testhost=${site}/${webrootpath}  \
-      # --screenfile=$snapshotfile $scriptargs 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
-    if $open
+    if $open && test -f "$snapshotfile"
     then
       open "$snapshotfile"
     fi
