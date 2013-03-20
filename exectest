@@ -32,6 +32,7 @@ Usage: $app --case testcasename [--path webrootpath] [--site hostname] [--open] 
        $app (-h|--help)
        $app -v|--view testcasename
        $app -l|--list testcasename
+       $app -e|--edit testcasename
        $app -x|--clean
 
 Where 
@@ -53,6 +54,8 @@ Where
 
   -l | --list  Lists any test cases matching expression testcasename
 
+  -e | --edit  Edits any test cases matching expression testcasename
+
   -x | --clean Removes any testout files (destructive!)
 
 Description
@@ -67,12 +70,21 @@ Example
 Limitations
 
   Tests are assumed to be located in ./testsuite/ 
+
   Test output is assumed to be located in ./testout/ 
+
   No attempt is made to keep history of old test runs. 
+
   Tests are assumed to be run on the casperjs engine.
+
   Tests are assumed to be written in coffeescript and end in the suffix ".coffee"
+
   Due to the way shell parses command lines, the scriptarg arguments cannot include spaces.
+
+  The -e option uses vi. Set and export the EDITOR shell variable to override.
 EOT
+
+
 
 }
 
@@ -223,8 +235,14 @@ function Main() {
     "-l"|"--list")
       shift
       export args="$*" 
-      export outputdir
       (cd testsuite; ls $args)
+      exit 0
+    ;;
+
+    "-e"|"--edit")
+      shift
+      export args="$*" 
+      (cd testsuite; vi $args)
       exit 0
     ;;
 
