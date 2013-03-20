@@ -55,6 +55,7 @@ Where
   -l | --list  Lists any test cases matching expression testcasename
 
   -e | --edit  Edits any test cases matching expression testcasename
+               The -e option uses MacVim by default. Set and export the EDITOR shell variable to override.
 
   -x | --clean Removes any testout files (destructive!)
 
@@ -81,7 +82,6 @@ Limitations
 
   Due to the way shell parses command lines, the scriptarg arguments cannot include spaces.
 
-  The -e option uses vi. Set and export the EDITOR shell variable to override.
 EOT
 
 
@@ -241,9 +241,7 @@ function Main() {
 
     "-e"|"--edit")
       shift
-      export args="$*" 
-      (cd testsuite; vi $args)
-      exit 0
+      exec ${EDITOR:-mvim --remote-tab } testsuite/$*
     ;;
 
     "-x"|"--clean")
