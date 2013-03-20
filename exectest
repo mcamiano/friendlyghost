@@ -145,6 +145,7 @@ function Main() {
   local site=''
   local webrootpath=''
   local outputdir="./testout"
+  local verbose=false
 
   local opendefault=${ExectestOpenDefault:-'false'}   # import default via shell variable 
   local casedefault=''
@@ -177,6 +178,10 @@ function Main() {
   while [[ ! -z "$1" ]]
   do
     case "$1" in 
+
+    "--verbose") 
+      export verbose=true
+    ;;
 
     "-h"|"--help")
       fusage
@@ -320,7 +325,10 @@ function Main() {
     fi
   fi
 
-  $ECHODBG find $outputdir -name "*.txt" -mtime -5m
+  if $verbose
+  then
+    $ECHODBG find $outputdir -name "*.txt" -mtime -5m
+  fi
 
   sig_untrap
 }
