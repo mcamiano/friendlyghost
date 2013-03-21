@@ -28,45 +28,73 @@ function fusage() {
   fi
   cat <<EOT
 $app: run a casperjs based test case
-Usage: $app --case testcasename [--path webrootpath] [--site hostname] [--open] [--nop] [--a "--username=foo" [-a "--password=bar"] ...]
-       $app (-h|--help)
+Usage: $app --case testcasename [-a "USERNAME=foo" [-a "PASSWORD=bar"] ...] [--open] [--nop]
+       $app -h|--help
        $app -v|--view testcasename
        $app -l|--list testcasename
        $app -e|--edit testcasename
+       $app -k|--config
        $app -x|--clean
 
 Where 
-  -c | --case  run ./testsuite/testcasename.coffee; required
-
-  -p | --path  The root web path relative to http://dev.wolftech.ncsu.edu/ is...; optional
-
-  -s | --site  The host is ... instead of dev.wolftech.ncsu.edu; optional
+  -c | --case  runs casper against ./testsuite/testcasename.coffee; required
 
   -o | --open  open a screenshot of session upon test failure; optional
 
   -n | --nop   "No Operation" - prevents anything from happening, echoes the steps to be taken; optional
 
-  -a | --scriptarg A string containing any named arguments to pass to the casperjs script; optional; use as many as needed
+  -a | --scriptarg Shell variables to put into the environment; optional; use as many as needed
 
+Other options
   -h | --help  Output this message
 
   -v | --view  Views test case output
 
   -l | --list  Lists any test cases matching expression testcasename
 
+  -k | --config Edits pretest.coffee, a shortcut to --edit pretest.coffee
+
   -e | --edit  Edits any test cases matching expression testcasename
-               The -e option uses MacVim by default. Set and export the EDITOR shell variable to override.
 
   -x | --clean Removes any testout files (destructive!)
 
+
 Description
-$app executes a test 
+$app executes one or more tests with casperjs and logs the results
+
+Tests are assumed to be written in coffeescript, with the suffix ".coffee"
+
+testcasename is a pattern which will be expanded to possibly multiple cases.
+If the pattern does not end with '.coffee', this will be appended before the match.
+
+The -e and -k options use MacVim by default. Set and export the EDITOR shell variable to override.
 
 Example
 
-  $app --open optional_other_inputs
+  $app --case some_test_case --open 
 
-  $app -case optional_other_inputs --path reu-assist --open
+  $app --case optional_other_inputs       \
+    -a 'TESTHOST="dev.wolftech.ncsu.edu"' \
+    -a 'USERNAME="staging"'               \
+    -a 'PASSWORD="DF459A91D14A110E"'
+
+Handling Auth Info and Other Parameters
+
+   The CasperJS test runner does not accept optional arguments at this time.
+   The workaround for the moment is to put test configuration provisioning into a pretest.coffee file.
+
+   To keep sensitive info out of files, set environmental variables just before you run tests.
+   To access these variables, put lines like the following into pretest.coffee:
+
+   var system = require('system'); 
+   var username = system.env.USERNAME; 
+   var password = system.env.PASSWORD; 
+
+   Boo provides the -a option as syntactic sugar for setting variables.
+
+Environmental Variables
+   testfile    ... the filename or pattern passed to the --case argument; this is set when boo runs casperjs
+   outputdir   ... the path where test log output and snapshots are stored
 
 Limitations
 
@@ -76,12 +104,10 @@ Limitations
 
   No attempt is made to keep history of old test runs. 
 
-  Tests are assumed to be run on the casperjs engine.
 
-  Tests are assumed to be written in coffeescript and end in the suffix ".coffee"
-
-  Due to the way shell parses command lines, the scriptarg arguments cannot include spaces.
-
+  Due to the way this script parses command lines, the -a arguments cannot include spaces.
+  To get around this in bash, export the variable prior to running boo:
+    export SOMETHING="value"
 EOT
 
 
@@ -142,16 +168,12 @@ function Main() {
   local open="false"
   local scriptargs=''
   local testcase=''
-  local site=''
-  local webrootpath=''
   local outputdir="./testout"
   local verbose=false
 
   local opendefault=${ExectestOpenDefault:-'false'}   # import default via shell variable 
   local casedefault=''
-  local sitedefault='dev.wolftech.ncsu.edu'
-  local webrootpathdefault=''
-  local scriptargsdefault=''
+  local scriptargsdefault='TESTHOST=dev.wolftech.ncsu.edu'
 
   # declare -a array_variable                      # Dereference as ${array_variable[nn]}
   # array_var2=( [0]="elem1" "eel2" "..." "eeelN" )# Dereference as ${array_var2[nn]}, ${array_var2[*]}, ${array_var2[@]}
@@ -192,24 +214,6 @@ function Main() {
       export ECHODBG="echo"
      ;;
 
-    "-p"|"--path")
-       if [[ -z "$2" ]]
-       then
-         ferror "--path missing path argument"
-       fi
-       webrootpath="$2"
-       shift
-    ;;
-
-    "-s"|"--site")
-       if [[ -z "$2" ]]
-       then
-         ferror "--site missing hostname argument"
-       fi
-       site="$2"
-       shift
-    ;;
-
     "-c"|"--case")
        if [[ -z "$2" ]]
        then
@@ -244,6 +248,11 @@ function Main() {
       exit 0
     ;;
 
+    "-k"|"--config")
+      shift
+      exec ${EDITOR:-mvim --remote-tab } testsuite/pretest.coffee
+    ;;
+
     "-e"|"--edit")
       shift
       exec ${EDITOR:-mvim --remote-tab } testsuite/$*
@@ -275,8 +284,11 @@ function Main() {
   scriptargs="${scriptargs:-$scriptargsdefault}"
   testcase=${testcase:-$casedefault}
   site=${site:-$sitedefault}
-  webrootpath=${webrootpath:-$webrootpathdefault}
-  testfile="./testsuite/${testcase}.coffee"
+  testfile="./testsuite/${testcase}"
+  if [[ "$testfile" != *.coffee ]]
+  then
+    testfile="./testsuite/${testcase}.coffee"
+  fi
   snapshotfile="$outputdir/${testcase}.coffee.png"
 
   if [[ -z "$testcase" ]]
@@ -284,9 +296,12 @@ function Main() {
     ferror "--case 'testcase' is a required argument." 
   fi
 
-  if [[ ! -f "$testfile" ]]
+  if [[ "$testfile" != *\** ]]
   then
-    ferror "'$testfile' is not a readable file." 
+    if [[ ! -f "$testfile" ]]
+    then
+      ferror "'$testfile' is not a readable file." 
+    fi
   fi
 
   if [[ ! -e $outputdir ]]
@@ -302,9 +317,14 @@ function Main() {
 
   if [[ "$ECHODBG" = "echo" ]]
   then
-    $ECHODBG "casperjs \"$testfile\"  --ignore-ssl-errors=yes  --testhost=${site}/${webrootpath} --screenfile=$snapshotfile $scriptargs 2>&1 | cat -v | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt"
+    $ECHODBG "export testfile outputdir"
+    $ECHODBG -n 'bash --restricted -c "$scriptargs; '
+    $ECHODBG "casperjs test $testfile \
+      --pre=./testsuite/pretest.coffee  \
+      --post=./testsuite/posttest.coffee \
+      --includes=./testsuite/eachtest.coffee\" 2>&1 | tee \${outputdir}/\$(basename \$testfile).\$(date +%m%d%y.%H%M).txt"
   else
-    export testfile
+    export testfile outputdir
     if $open
     then
       /bin/rm "$snapshotfile" 2>/dev/null
@@ -313,11 +333,11 @@ function Main() {
       # casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
       # --direct  --log-level=debug  --fail-fast  
       # or just pass ./testsuite/ directory
-    casperjs test  "$testfile" \
-      --pre=./testsuite/pretest.coffee  \
-      --post=./testsuite/posttest.coffee \
-      --includes=./testsuite/eachtest.coffee \
-    2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
+    bash --restricted -c "$scriptargs; casperjs test  $testfile \\
+      --pre=./testsuite/pretest.coffee  \\
+      --post=./testsuite/posttest.coffee \\
+      --includes=./testsuite/eachtest.coffee
+    " 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
 
     if $open && test -f "$snapshotfile"
     then
