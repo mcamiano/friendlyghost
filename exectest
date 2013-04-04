@@ -320,6 +320,7 @@ function Main() {
     $ECHODBG "export testfile outputdir"
     $ECHODBG -n 'bash --restricted -c "$scriptargs; '
     $ECHODBG "casperjs test $testfile \
+      --ignore-ssl-errors=yes \
       --pre=./testsuite/pretest.coffee  \
       --post=./testsuite/posttest.coffee \
       --includes=./testsuite/eachtest.coffee\" 2>&1 | tee \${outputdir}/\$(basename \$testfile).\$(date +%m%d%y.%H%M).txt"
@@ -333,7 +334,7 @@ function Main() {
       # casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
       # --direct  --log-level=debug  --fail-fast  
       # or just pass ./testsuite/ directory
-    bash --restricted -c "$scriptargs; casperjs test  $testfile \\
+    bash --ignore-ssl-errors=yes --restricted -c "$scriptargs; casperjs test  $testfile \\
       --pre=./testsuite/pretest.coffee  \\
       --post=./testsuite/posttest.coffee \\
       --includes=./testsuite/eachtest.coffee
