@@ -1,4 +1,4 @@
-#!/bin/bash      
+#!/bin/bash
 #  OR  #!/bin/env -i /bin/bash   # For clearing all environmental variables before running
 # Script to run a casperjs based test case
 
@@ -28,7 +28,7 @@ function fusage() {
   fi
   cat <<EOT
 $app: run a casperjs based test case
-Usage: $app --case testcasename [-a "USERNAME=foo" [-a "PASSWORD=bar"] ...] [--open] [--nop]
+Usage: $app --case testcasename [-s suite/path] [-a "USERNAME=foo" [-a "PASSWORD=bar"] ...] [--open] [--nop]
        $app -h|--help
        $app -v|--view testcasename
        $app -l|--list testcasename
@@ -38,6 +38,8 @@ Usage: $app --case testcasename [-a "USERNAME=foo" [-a "PASSWORD=bar"] ...] [--o
 
 Where 
   -c | --case  runs casper against ./testsuite/testcasename.coffee; required
+
+  -s | --suite changes the default location ./testsuite to suite/path; optional
 
   -o | --open  open a screenshot of session upon test failure; optional
 
@@ -168,11 +170,13 @@ function Main() {
   local open="false"
   local scriptargs=''
   local testcase=''
+  local testsuite='./testsuite'
   local outputdir="./testout"
   local verbose=false
 
   local opendefault=${ExectestOpenDefault:-'false'}   # import default via shell variable 
   local casedefault=''
+  local testsuitedefault='./testsuite'
   local scriptargsdefault='TESTHOST=dev.wolftech.ncsu.edu'
 
   # declare -a array_variable                      # Dereference as ${array_variable[nn]}
@@ -223,6 +227,15 @@ function Main() {
        shift
     ;;
 
+    "-s"|"--suite")
+       if [[ -z "$2" ]]
+       then
+         ferror "--suite missing suite-path argument"
+       fi
+       testsuite="$2"
+       shift
+    ;;
+
     "-a"|"--scriptarg")
        if [[ -z "$2" ]]
        then
@@ -231,7 +244,7 @@ function Main() {
        scriptargs="$scriptargs $2"
        shift
     ;;
-      
+
     "-v"|"--view")
        if [[ -z "$2" ]]
        then
@@ -244,18 +257,18 @@ function Main() {
     "-l"|"--list")
       shift
       export args="$*" 
-      (cd testsuite; ls $args)
+      (cd $testsuite; ls $args)
       exit 0
     ;;
 
     "-k"|"--config")
       shift
-      exec ${EDITOR:-mvim --remote-tab } testsuite/pretest.coffee
+      exec ${EDITOR:-mvim --remote-tab } $testsuite/pretest.coffee
     ;;
 
     "-e"|"--edit")
       shift
-      exec ${EDITOR:-mvim --remote-tab } testsuite/$*
+      exec ${EDITOR:-mvim --remote-tab } $testsuite/$*
     ;;
 
     "-x"|"--clean")
@@ -268,11 +281,11 @@ function Main() {
     "-o"|"--open")
        open="true"
     ;;
-      
+
     *)   # handle other arguments
       ferror "Unexpected argument! Bailing out..."
     ;;
-      
+
     esac
     shift
   done
@@ -282,12 +295,19 @@ function Main() {
   # So here we check arguments to realize the final default overrides
   open=${open:-$opendefault}
   scriptargs="${scriptargs:-$scriptargsdefault}"
+  export testsuite=${testsuite:-$testsuitedefault}
   testcase=${testcase:-$casedefault}
   site=${site:-$sitedefault}
-  testfile="./testsuite/${testcase}"
+  testfile="$testsuite/${testcase}"
+
+  if [[ ( ! -d "$testsuite" ) || $( x=`echo $testsuite/*.coffee`; [[ -f ${x%% $testsuite/*.coffee} ]] )  ]]
+  then
+    ferror "--suite argument $testsuite must be a non-empty directory." 
+  fi
+
   if [[ "$testfile" != *.coffee ]]
   then
-    testfile="./testsuite/${testcase}.coffee"
+    testfile="$testsuite/${testcase}.coffee"
   fi
   snapshotfile="$outputdir/${testcase}.coffee.png"
 
@@ -321,9 +341,9 @@ function Main() {
     $ECHODBG -n 'bash --restricted -c "$scriptargs; '
     $ECHODBG "casperjs test $testfile \
       --ignore-ssl-errors=yes \
-      --pre=./testsuite/pretest.coffee  \
-      --post=./testsuite/posttest.coffee \
-      --includes=./testsuite/eachtest.coffee\" 2>&1 | tee \${outputdir}/\$(basename \$testfile).\$(date +%m%d%y.%H%M).txt"
+      --pre=$testsuite/pretest.coffee  \
+      --post=$testsuite/posttest.coffee \
+      --includes=$testsuite/eachtest.coffee\" 2>&1 | tee \${outputdir}/\$(basename \$testfile).\$(date +%m%d%y.%H%M).txt"
   else
     export testfile outputdir
     if $open
@@ -335,9 +355,9 @@ function Main() {
       # --direct  --log-level=debug  --fail-fast  
       # or just pass ./testsuite/ directory
     bash --ignore-ssl-errors=yes --restricted -c "$scriptargs; casperjs test  $testfile \\
-      --pre=./testsuite/pretest.coffee  \\
-      --post=./testsuite/posttest.coffee \\
-      --includes=./testsuite/eachtest.coffee
+      --pre=$testsuite/pretest.coffee  \\
+      --post=$testsuite/posttest.coffee \\
+      --includes=$testsuite/eachtest.coffee
     " 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
 
     if $open && test -f "$snapshotfile"
