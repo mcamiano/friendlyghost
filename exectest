@@ -35,6 +35,7 @@ Usage: $app --case testcasename [-s suite/path] [-a "USERNAME=foo" [-a "PASSWORD
        $app -e|--edit testcasename
        $app -k|--config
        $app -x|--clean
+       $app --lint testcasename
 
 Where 
   -c | --case  runs casper against ./testsuite/testcasename.coffee; required
@@ -59,6 +60,8 @@ Other options
   -e | --edit  Edits any test cases matching expression testcasename
 
   -x | --clean Removes any testout files (destructive!)
+
+  --lint Runs coffeelint against the test case
 
 
 Description
@@ -269,6 +272,11 @@ function Main() {
     "-e"|"--edit")
       shift
       exec ${EDITOR:-mvim --remote-tab } $testsuite/$*
+    ;;
+
+    "--lint")
+      shift
+      exec coffeelint testsuite/${1}.coffee
     ;;
 
     "-x"|"--clean")
