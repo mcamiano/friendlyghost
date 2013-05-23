@@ -1,3 +1,7 @@
 [submodule "casperjs"]
 	path = casperjs
 	url = git@github.com:mcamiano/casperjs.git
+
+[submodule "spookyjs"]
+	path = spookyjs
+	url = git@github.com:WaterfallEngineering/SpookyJS.git
