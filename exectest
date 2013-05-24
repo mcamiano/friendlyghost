@@ -28,7 +28,7 @@ function fusage() {
   fi
   cat <<EOT
 $app: run a casperjs based test case
-Usage: $app --case testcasename [-s suite/path] [-a "USERNAME=foo" [-a "PASSWORD=bar"] ...] [--open] [--nop]
+Usage: $app --case testcasename [-s suite/path] [-a "BOO_USERNAME=foo" [-a "BOO_PASSWORD=bar"] ...] [--open] [--nop]
        $app -h|--help
        $app -v|--view testcasename
        $app -l|--list testcasename
@@ -180,7 +180,7 @@ function Main() {
   local opendefault=${ExectestOpenDefault:-'false'}   # import default via shell variable 
   local casedefault=''
   local testsuitedefault='./testsuite'
-  local scriptargsdefault='TESTHOST=dev.wolftech.ncsu.edu'
+  local scriptargsdefault='BOO_TESTHOST=dev.wolftech.ncsu.edu'
 
   # declare -a array_variable                      # Dereference as ${array_variable[nn]}
   # array_var2=( [0]="elem1" "eel2" "..." "eeelN" )# Dereference as ${array_var2[nn]}, ${array_var2[*]}, ${array_var2[@]}
@@ -346,7 +346,7 @@ function Main() {
   if [[ "$ECHODBG" = "echo" ]]
   then
     $ECHODBG "export testfile outputdir"
-    $ECHODBG -n 'bash --restricted -c "$scriptargs; '
+    $ECHODBG -n 'bash -c "export '$scriptargs;
     $ECHODBG "casperjs test $testfile \
       --ignore-ssl-errors=yes \
       --pre=$testsuite/pretest.coffee  \
@@ -362,7 +362,8 @@ function Main() {
       # casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
       # --direct  --log-level=debug  --fail-fast  
       # or just pass ./testsuite/ directory
-    bash --ignore-ssl-errors=yes --restricted -c "$scriptargs; casperjs test  $testfile \\
+    bash -c "export $scriptargs; casperjs test  $testfile \\
+      --ignore-ssl-errors=yes         \\
       --pre=$testsuite/pretest.coffee  \\
       --post=$testsuite/posttest.coffee \\
       --includes=$testsuite/eachtest.coffee
