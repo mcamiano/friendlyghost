@@ -28,17 +28,19 @@ function fusage() {
   fi
   cat <<EOT
 $app: run a casperjs based test case
-Usage: $app --case testcasename [-s suite/path] [-a "BOO_USERNAME=foo" [-a "BOO_PASSWORD=bar"] ...] [--open] [--nop]
+Usage: $app --case testcasename [-s suite/path] [-a "FOO=foo" [-a "BAR=bar"] ...] [--open] [--nop]
        $app -h|--help
        $app -v|--view testcasename
-       $app -l|--list testcasename
-       $app -e|--edit testcasename
+       $app -l|--list testcasename(s)
+       $app -e|--edit testcasename[.coffee]
        $app -k|--config
        $app -x|--clean
        $app --lint testcasename
+       $app testcasename
 
 Where 
   -c | --case  runs casper against ./testsuite/testcasename.coffee; required
+               The last form is a shorthand for --case.
 
   -s | --suite changes the default location ./testsuite to suite/path; optional
 
@@ -47,6 +49,7 @@ Where
   -n | --nop   "No Operation" - prevents anything from happening, echoes the steps to be taken; optional
 
   -a | --scriptarg Shell variables to put into the environment; optional; use as many as needed
+                   DO NOT use this to set passwords: they will show up in 'ps' command output!!!
 
 Other options
   -h | --help  Output this message
@@ -78,37 +81,53 @@ Example
 
   $app --case some_test_case --open 
 
+  read -s -p "PW:" BOO_PASSWORD
   $app --case optional_other_inputs       \
     -a 'TESTHOST="dev.wolftech.ncsu.edu"' \
-    -a 'USERNAME="staging"'               \
-    -a 'PASSWORD="DF459A91D14A110E"'
+    -a 'BOO_USERNAME="staging"'
 
 Handling Auth Info and Other Parameters
 
-   The CasperJS test runner does not accept optional arguments at this time.
-   The workaround for the moment is to put test configuration provisioning into a pretest.coffee file.
+  The CasperJS test runner does not accept optional arguments at this time.
+  The workaround for the moment is to put test configuration provisioning into a pretest.coffee file.
 
-   To keep sensitive info out of files, set environmental variables just before you run tests.
-   To access these variables, put lines like the following into pretest.coffee:
+  To keep sensitive info out of files, set environmental variables just before you run tests.
+  To access these variables, put lines like the following into pretest.coffee:
 
-   var system = require('system'); 
-   var username = system.env.USERNAME; 
-   var password = system.env.PASSWORD; 
-
-   Boo provides the -a option as syntactic sugar for setting variables.
+  var system = require('system'); 
+  var username = system.env.BOO_USERNAME; 
+  var password = system.env.BOO_PASSWORD; 
 
 Environmental Variables
-   testfile    ... the filename or pattern passed to the --case argument; this is set when boo runs casperjs
-   outputdir   ... the path where test log output and snapshots are stored
+  Variables can be set with -a. No variables are imported by the boo wrapper script.
+  It is up the CasperJS script to determine what to import.
+
+  The "testsuite" variable is set and exported. All other script variables are declared as locals.
+  testsuite   ... the location of test suite scripts
+
+
+  The author uses a shell function to manage password setting at the start of a new session:
+  
+    function runtest() {
+      while [[ -z "\$BOO_PASSWORD" ]]
+      do
+        read -s -p "Password ?" BOO_PASSWORD
+      done
+
+      export BOO_USERNAME=\$USER BOO_PASSWORD
+
+      clear
+
+      \$(viewhome)/testtools/friendlyghost/boo \$*
+    }
 
 Limitations
 
-  Tests are assumed to be located in ./testsuite/ 
+  The -a option should not be used for passwords, as they will be visible to any user who can run the ps command.
 
   Test output is assumed to be located in ./testout/ 
 
   No attempt is made to keep history of old test runs. 
-
 
   Due to the way this script parses command lines, the -a arguments cannot include spaces.
   To get around this in bash, export the variable prior to running boo:
@@ -271,7 +290,15 @@ function Main() {
 
     "-e"|"--edit")
       shift
-      exec ${EDITOR:-mvim --remote-tab } $testsuite/$*
+      if [[ "$1" =~ "[a-zA-Z0-9]*\*" ]]
+      then
+        exec ${EDITOR:-mvim --remote-tab } $testsuite/$1
+      elif [[ "$1" =~ ".*\.coffee" ]]
+      then
+        exec ${EDITOR:-mvim --remote-tab } $testsuite/$1
+      else
+        exec ${EDITOR:-mvim --remote-tab } ${testsuite}/${1}.coffee
+      fi
     ;;
 
     "--lint")
@@ -291,7 +318,11 @@ function Main() {
     ;;
 
     *)   # handle other arguments
-      ferror "Unexpected argument! Bailing out..."
+      if [[ "$1" =~ "-*" ]]
+      then
+        ferror "Unexpected argument! Bailing out..."
+      fi
+      testcase="$1"
     ;;
 
     esac
