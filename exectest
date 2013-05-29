@@ -28,7 +28,7 @@ function fusage() {
   fi
   cat <<EOT
 $app: run a casperjs based test case
-Usage: $app --case testcasename [-s suite/path] [-a "FOO=foo" [-a "BAR=bar"] ...] [--open] [--nop]
+Usage: $app --case testcasename [-s suite/path] [-a "FOO=foo" [-a "BAR=bar"] ...] [--open] [--nop] [--reset]
        $app -h|--help
        $app -v|--view testcasename
        $app -l|--list testcasename(s)
@@ -47,6 +47,9 @@ Where
   -o | --open  open a screenshot of session upon test failure; optional
 
   -n | --nop   "No Operation" - prevents anything from happening, echoes the steps to be taken; optional
+
+  -r | --reset "Reset Database" - loads a mysql script 'testcasename.fix' to provision a data set
+               Ignored if \$HOSTNAME starts with 'www', or if testcasename.fix is not a regular file.
 
   -a | --scriptarg Shell variables to put into the environment; optional; use as many as needed
                    DO NOT use this to set passwords: they will show up in 'ps' command output!!!
@@ -98,6 +101,26 @@ Handling Auth Info and Other Parameters
   var username = system.env.BOO_USERNAME; 
   var password = system.env.BOO_PASSWORD; 
 
+Provisioning Data Sets as Test Prerequisites
+
+  When you use the --reset option, boo attempts to find a SQL script in the testsuite/fixtures/
+  folder, named the same as your test case, with a suffix of '.fix'. 
+
+  USE WITH CAUTION: --reset WILL destructively alter the data set. 
+
+  It runs /usr/local/bin/mysql, using unauthenticated access, and loads the .fix file like this:
+
+  #!/bin/bash
+  /usr/local/bin/mysql -u root <<EOT
+  USE my_fancy_database;
+  TRUNCATE TABLE foobar;
+  INSERT INTO foobar (foo, bar, baz, bif, bof, bofur) VALUES (1,2,3,4,5,6);
+  EOT
+
+  Note: built-in fixtures rely upon an open mysql configuration set up for development
+  on a users' local workstation. This is for safety: --reset cannot be used by default in 
+  a production or staging environment without modification.
+
 Environmental Variables
   Variables can be set with -a. No variables are imported by the boo wrapper script.
   It is up the CasperJS script to determine what to import.
@@ -132,6 +155,7 @@ Limitations
   Due to the way this script parses command lines, the -a arguments cannot include spaces.
   To get around this in bash, export the variable prior to running boo:
     export SOMETHING="value"
+
 EOT
 
 
@@ -196,7 +220,8 @@ function Main() {
   local outputdir="./testout"
   local verbose=false
 
-  local opendefault=${ExectestOpenDefault:-'false'}   # import default via shell variable 
+  local opendefault='false'
+  local resetdefault='false'
   local casedefault=''
   local testsuitedefault='./testsuite'
   local scriptargsdefault='BOO_TESTHOST=dev.wolftech.ncsu.edu'
@@ -288,6 +313,13 @@ function Main() {
       exec ${EDITOR:-mvim --remote-tab } $testsuite/pretest.coffee
     ;;
 
+    "-r"|"--reset")
+      if [[ ! "$HOSTNAME" =~ "www" ]]
+      then
+        reset=true
+      fi
+    ;;
+
     "-e"|"--edit")
       shift
       if [[ "$1" =~ "[a-zA-Z0-9]*\*" ]]
@@ -333,11 +365,13 @@ function Main() {
   # use conditional logic for computing default after all options have been parsed
   # So here we check arguments to realize the final default overrides
   open=${open:-$opendefault}
+  reset=${reset:-$resetdefault}
   scriptargs="${scriptargs:-$scriptargsdefault}"
   export testsuite=${testsuite:-$testsuitedefault}
   testcase=${testcase:-$casedefault}
   site=${site:-$sitedefault}
   testfile="$testsuite/${testcase}"
+  testfixture="$testsuite/fixtures/${testcase%%.coffee}.fix"
 
   if [[ ( ! -d "$testsuite" ) || $( x=`echo $testsuite/*.coffee`; [[ -f ${x%% $testsuite/*.coffee} ]] )  ]]
   then
@@ -390,6 +424,16 @@ function Main() {
       /bin/rm "$snapshotfile" 2>/dev/null
     fi
 
+    if $reset
+    then
+      if [[ -f $testfixture ]]
+      then
+        echo "Resetting fixture: $testfixture"
+        /usr/local/bin/mysql --host=localhost --user root < ${testfixture}
+      else
+        echo "Warning: fixture: $testfixture is not an ordinary file"
+      fi
+    fi
       # casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
       # --direct  --log-level=debug  --fail-fast  
       # or just pass ./testsuite/ directory
