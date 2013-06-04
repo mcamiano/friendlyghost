@@ -323,7 +323,6 @@ function Main() {
       if [[ ! "$HOSTNAME" =~ "www" ]]
       then
         reset=true
-        nocmd=false
       fi
     ;;
 
