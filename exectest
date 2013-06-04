@@ -37,6 +37,7 @@ Usage: $app --case testcasename [-s suite/path] [-a "FOO=foo" [-a "BAR=bar"] ...
        $app -x|--clean
        $app --lint testcasename
        $app testcasename
+       $app
 
 Where 
   -c | --case  runs casper against ./testsuite/testcasename.coffee; required
@@ -72,6 +73,8 @@ Other options
 
 Description
 $app executes one or more tests with casperjs and logs the results
+
+When run without a direct command argument, boo displays a menu of cases; chosing a case executes it.
 
 Tests are assumed to be written in coffeescript, with the suffix ".coffee"
 
@@ -247,13 +250,15 @@ function Main() {
   # let varname=varname+1 ; let "varname = varname + 1"
   # ((varname+=1))
   # varname=$(($varname+1)); varname=(($varname+1)); varname=((varname+1))
-
+  nocmd=true
+  cmdline="$*"
   while [[ ! -z "$1" ]]
   do
     case "$1" in 
 
     "--verbose") 
       export verbose=true
+      nocmd=false
     ;;
 
     "-h"|"--help")
@@ -271,6 +276,7 @@ function Main() {
          ferror "--case missing testcasename argument"
        fi
        testcase="$2"
+       nocmd=false
        shift
     ;;
 
@@ -317,6 +323,7 @@ function Main() {
       if [[ ! "$HOSTNAME" =~ "www" ]]
       then
         reset=true
+        nocmd=false
       fi
     ;;
 
@@ -346,6 +353,7 @@ function Main() {
     ;;
 
     "-o"|"--open")
+       nocmd=false
        open="true"
     ;;
 
@@ -373,7 +381,12 @@ function Main() {
   testfile="$testsuite/${testcase}"
   testfixture="$testsuite/fixtures/${testcase%%.coffee}.fix"
 
-  if [[ ( ! -d "$testsuite" ) || $( x=`echo $testsuite/*.coffee`; [[ -f ${x%% $testsuite/*.coffee} ]] )  ]]
+  if [[ ( ! -d "$testsuite" ) ]]
+  then
+    ferror "Missing testsuite! Are you sure you're running this from the correct repo folder???"
+  fi
+
+  if [[ $( x=`echo $testsuite/*.coffee`; [[ -f ${x%% $testsuite/*.coffee} ]] )  ]]
   then
     ferror "--suite argument $testsuite must be a non-empty directory." 
   fi
@@ -383,6 +396,23 @@ function Main() {
     testfile="$testsuite/${testcase}.coffee"
   fi
   snapshotfile="$outputdir/${testcase}.coffee.png"
+
+  if $nocmd
+  then
+     (while true; do
+        select name in $(cd $testsuite; /bin/ls *.coffee|egrep -v "(pre|post)test.coffee"); do 
+          case $name in 
+          [0-9a-z_A-Z\-]*.coffee)
+            ($0 $cmdline --case $name)
+          ;;
+          *) 
+            exit 0
+          ;;
+          esac
+        done
+      done)
+     exit 0
+  fi
 
   if [[ -z "$testcase" ]]
   then
