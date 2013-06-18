@@ -89,6 +89,15 @@ Particulars about deployed locations, usernames, passwords, or resources are a b
 Turn these facts into parameters, and stick them into a casper.testSetup object inside of the testsuite/pretest.coffee script. 
 (Ideally, a test suite configuration should be a command line option to boo, but for the moment it is fixed to pretest.coffee).
 
+Using in Travis CI
+==================
+boo is a shell script that depends on casperjs (and optionally coffeelint). To get it running on Travis CI you'll need to install casperjs, either in the base machine via a chef recipe
+such as https://github.com/jenkinslaw/casperjs-cookbook/tree/master/recipes , or via a local copy of the code.
+
+Friendlyghost should itself be installed via a chef recipe. The skunkworks versions used a git submodule, which is not ideal and could be a problem depending upon the submodule support in Travis CI. 
+
+Other than that, boo should return a non-zero status code on failure, zero on a clean test. (If the skunkworks script doesn't in all cases, that's a bug.)
+
 Limitations
 ===========
 There are many, and frequent. Suites are still ill-defined constructs. Boo is a skunkworks shell script with some error checking but many assumptions. For that reason also, there is not yet a test suite for boo. The plan is to re-write it in Ruby when the basic functionality has settled down.
