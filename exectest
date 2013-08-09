@@ -96,6 +96,8 @@ Handling Auth Info and Other Parameters
 
   The CasperJS test runner does not accept optional arguments at this time.
   The workaround for the moment is to put test configuration provisioning into a pretest.coffee file.
+  You can also put code into eachtest.coffee, which gets executed upon each test case.
+  Put cleanup code into posttest.coffee.
 
   To keep sensitive info out of files, set environmental variables just before you run tests.
   To access these variables, put lines like the following into pretest.coffee:
@@ -396,10 +398,11 @@ function Main() {
   fi
   snapshotfile="$outputdir/${testcase}.coffee.png"
 
+  # Command line menu when no test case options are provided
   if $nocmd
   then
      (while true; do
-        select name in $(cd $testsuite; /bin/ls *.coffee|egrep -v "(pre|post)test.coffee"); do 
+        select name in $(cd $testsuite; /bin/ls *.coffee|egrep -v "(pre|post|each)test.coffee"); do 
           case $name in 
           [0-9a-z_A-Z\-]*.coffee)
             ($0 $cmdline --case $name)
