@@ -6,6 +6,7 @@
 # set -o errexit    # uncomment to exit immediately when command returns non-zero; stupid to do since non-zero is often not a fatal error
 
 export app=$(basename $0)   # default application name
+export apploc=$(dirname $(which $0))   # default application name
 umask 177                   # default file permissions mask
 
 # source $(dirname $0)/library.file.sh   # uncomment and adjust to incorporate external script; recommend to use shell functions
@@ -167,6 +168,7 @@ trap sig_cleanup_or_rollback     HUP INT QUIT TERM
 function Main() {
   # Baseline default settings so defaults cannot be imported accidentally
   local ECHODBG=''
+  local casperjs='$apploc/casperjs/bin/casperjs'
   local open="false"
   local scriptargs=''
   local testcase=''
@@ -178,6 +180,7 @@ function Main() {
   local casedefault=''
   local testsuitedefault='./testsuite'
   local scriptargsdefault='TESTHOST=dev.wolftech.ncsu.edu'
+  local commonfile="$apploc/test.common.coffee"
 
   # declare -a array_variable                      # Dereference as ${array_variable[nn]}
   # array_var2=( [0]="elem1" "eel2" "..." "eeelN" )# Dereference as ${array_var2[nn]}, ${array_var2[*]}, ${array_var2[@]}
@@ -335,13 +338,18 @@ function Main() {
     fi
   fi
 
+  if [[ -f $testsuite/pretest.coffee ]]
+  then
+    commonfile="$testsuite/pretest.coffee"
+  fi
+
   if [[ "$ECHODBG" = "echo" ]]
   then
     $ECHODBG "export testfile outputdir"
     $ECHODBG -n 'bash --restricted -c "$scriptargs; '
-    $ECHODBG "casperjs test $testfile \
-      --ignore-ssl-errors=yes \
-      --pre=$testsuite/pretest.coffee  \
+    $ECHODBG "$casperjs test $testfile \
+      --ignore-ssl-errors=yes         \
+      --pre=$commonfile                \
       --post=$testsuite/posttest.coffee \
       --includes=$testsuite/eachtest.coffee\" 2>&1 | tee \${outputdir}/\$(basename \$testfile).\$(date +%m%d%y.%H%M).txt"
   else
@@ -354,8 +362,9 @@ function Main() {
       # casperjs test $testfile --includes=foo.js,bar.js --pre=pre-test.js  --post=post-test.js \
       # --direct  --log-level=debug  --fail-fast  
       # or just pass ./testsuite/ directory
-    bash --ignore-ssl-errors=yes --restricted -c "$scriptargs; casperjs test  $testfile \\
-      --pre=$testsuite/pretest.coffee  \\
+    bash -c "$scriptargs; $casperjs test  $testfile \\
+      --ignore-ssl-errors=yes         \\
+      --pre=$commonfile                \\
       --post=$testsuite/posttest.coffee \\
       --includes=$testsuite/eachtest.coffee
     " 2>&1 | tee ${outputdir}/$(basename $testfile).$(date +%m%d%y.%H%M).txt
