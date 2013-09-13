@@ -1,0 +1,35 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at http://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file"
+    ],
+    "hash": "71a153450b26ee2a6b7d6348fe84c489",
+    "packages": [
+        {
+            "name": "casperjs",
+            "version": "1.0",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:mcamiano/casperjs.git",
+                "reference": "boo"
+            },
+            "type": "library"
+        }
+    ],
+    "packages-dev": [
+
+    ],
+    "aliases": [
+
+    ],
+    "minimum-stability": "stable",
+    "stability-flags": [
+
+    ],
+    "platform": [
+
+    ],
+    "platform-dev": [
+
+    ]
+}

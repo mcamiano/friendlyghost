@@ -1,0 +1,20 @@
+{
+  "name": "Wolftech-IT/friendlyghost",
+  "repositories": {
+    "casperjs": {
+      "type": "package",
+      "package": {
+        "name": "casperjs",
+        "version": "1.0",
+        "source": {
+          "url": "git@github.ncsu.edu:mcamiano/casperjs.git",
+          "type": "git",
+          "reference": "boo"
+        }
+      }
+    }
+  },
+  "require": {
+    "casperjs": "1.*"
+  }
+}
