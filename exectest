@@ -66,6 +66,8 @@ Other options
 
   -e | --edit  Edits any test cases matching expression testcasename
 
+  -E | --env   Shows Exports for any environmental variables it uses
+
   -x | --clean Removes any testout files (destructive!)
 
   --lint Runs coffeelint against the test case
@@ -230,6 +232,7 @@ function Main() {
   local casedefault=''
   local testsuitedefault='./testsuite'
   local scriptargsdefault='BOO_TESTHOST=dev.wolftech.ncsu.edu'
+  local showenv=false
 
   # declare -a array_variable                      # Dereference as ${array_variable[nn]}
   # array_var2=( [0]="elem1" "eel2" "..." "eeelN" )# Dereference as ${array_var2[nn]}, ${array_var2[*]}, ${array_var2[@]}
@@ -328,6 +331,10 @@ function Main() {
       fi
     ;;
 
+    "-E"|"--env")
+      showenv=true
+    ;;
+
     "-e"|"--edit")
       shift
       if [[ "$1" =~ "[a-zA-Z0-9]*\*" ]]
@@ -381,6 +388,24 @@ function Main() {
   site=${site:-$sitedefault}
   testfile="$testsuite/${testcase}"
   testfixture="$testsuite/fixtures/${testcase%%.coffee}.fix"
+
+  if $showenv
+  then
+      /bin/cat <<EOT
+# HOSTNAME=$HOSTNAME
+# testsuite=$testsuite
+# testcase=$testcase
+# testfile=$testfile
+# testfixture=$testfixture
+# site=$site
+export EDITOR=${EDITOR}
+export BOO_PASSWORD=${BOO_PASSWORD}
+export BOO_USERNAME=${BOO_USERNAME}
+export BOO_DATABASE=${BOO_DATABASE}
+$scriptargs
+EOT
+    exit 0
+  fi
 
   if [[ ( ! -d "$testsuite" ) ]]
   then
