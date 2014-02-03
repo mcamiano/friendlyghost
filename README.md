@@ -12,6 +12,14 @@ You need [casperjs](http://casperjs.org) installed in an executable path; [homeb
 brew install casperjs
 ```
 
+If `casperjs --version` complains that it cannot use PhantomJS 1.9 and above, use `brew uninstall phantomjs` to uninstall it
+and then 
+```bash
+brew search phantomjs   # Look for most recent version < 1.9
+brew install homebrew/versions/phantomjs182
+```
+
+
 I prefer to add friendlyghost as a submodule to my repos (but you can clone it):  
 
 ```bash
